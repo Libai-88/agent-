@@ -18,6 +18,8 @@ env/
 
 # 运行时数据库（agent 状态/checkpoint）
 *.db
+*.db-shm
+*.db-wal
 *.db-journal
 *.sqlite
 *.sqlite3
@@ -30,6 +32,11 @@ checkpoints.db
 # 日志
 *.log
 web.log
+obs.log
+
+# 观测/压力测试产生的日志目录
+logs/
+stress_logs/
 
 # IDE
 .idea/
