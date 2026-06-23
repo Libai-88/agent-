@@ -43,7 +43,7 @@ agent = create_deep_agent(
         "3) 最后产出放在 final_report.md\n"
         "4) 用中文，所有数字保留千分位"
     ),
-    backend=FilesystemBackend(root_dir=WORKSPACE),  # 关键：把虚拟文件落地
+    backend=FilesystemBackend(root_dir=WORKSPACE, virtual_mode=True),  # 关键：把虚拟文件落地
 )
 
 task = (

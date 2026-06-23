@@ -14,6 +14,10 @@ from langchain_openai import ChatOpenAI
 from deepagents import create_deep_agent
 from deepagents.backends import FilesystemBackend
 from langgraph.store.memory import InMemoryStore
+try:
+    from langgraph.store.sqlite import SqliteStore
+except ImportError:
+    from langgraph.checkpoint.sqlite import SqliteStore  # 旧路径兜底
 
 load_dotenv()
 model = ChatOpenAI(

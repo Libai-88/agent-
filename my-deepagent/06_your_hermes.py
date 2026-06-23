@@ -20,6 +20,8 @@ from langchain_core.tools import tool
 from deepagents import create_deep_agent
 from deepagents.backends import FilesystemBackend
 from langgraph.store.sqlite import SqliteStore
+from langgraph.checkpoint.sqlite import SqliteSaver
+import sqlite3
 
 load_dotenv()
 model = ChatOpenAI(
@@ -63,6 +65,7 @@ SKILLS.mkdir(exist_ok=True)
 # ============== 长期记忆（SQLite，跨进程保留） ==============
 db_path = str(Path(__file__).parent / "memory.db")
 store = SqliteStore.from_conn_string(db_path)
+checkpointer = SqliteSaver(sqlite3.connect(str(Path(__file__).parent / "checkpoints.db"), check_same_thread=False))
 
 # ============== 装配你的"HerMES" ==============
 agent = create_deep_agent(
@@ -83,8 +86,9 @@ agent = create_deep_agent(
         "system_prompt": "你是 code-worker。用 run_python 验证结论。",
         "tools": [run_python],
     }],
-    backend=FilesystemBackend(root_dir=str(WORKSPACE)),
+    backend=FilesystemBackend(root_dir=str(WORKSPACE), virtual_mode=True),
     store=store,
+    checkpointer=checkpointer,
 )
 
 # ============== REPL：和你的 Agent 对话 ==============

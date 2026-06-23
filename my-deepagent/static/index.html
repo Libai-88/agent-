@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>Hermes Chat</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+         background:#0f172a; color:#e2e8f0; height:100vh; display:flex; flex-direction:column; }
+  header { padding:12px 20px; background:#1e293b; border-bottom:1px solid #334155;
+           display:flex; justify-content:space-between; align-items:center; }
+  header h1 { margin:0; font-size:16px; color:#38bdf8; }
+  header .meta { font-size:12px; color:#94a3b8; }
+  #chat { flex:1; overflow-y:auto; padding:20px; }
+  .msg { max-width:80%; margin:8px 0; padding:10px 14px; border-radius:12px;
+         white-space:pre-wrap; word-wrap:break-word; }
+  .user { background:#2563eb; color:white; margin-left:auto; }
+  .ai { background:#1e293b; color:#e2e8f0; border:1px solid #334155; }
+  .tool { background:#064e3b; color:#a7f3d0; font-family:monospace; font-size:12px; }
+  .error { background:#7f1d1d; color:#fecaca; }
+  footer { padding:12px 20px; background:#1e293b; border-top:1px solid #334155;
+           display:flex; gap:8px; }
+  input { flex:1; padding:10px 14px; border-radius:8px; border:1px solid #334155;
+          background:#0f172a; color:#e2e8f0; font-size:14px; outline:none; }
+  input:focus { border-color:#38bdf8; }
+  button { padding:10px 20px; background:#38bdf8; color:#0f172a; border:none;
+           border-radius:8px; font-weight:600; cursor:pointer; }
+  button:disabled { background:#475569; cursor:not-allowed; }
+  .typing { display:inline-block; }
+  .typing::after { content:"▍"; animation:blink 1s infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+  table { border-collapse:collapse; margin:8px 0; }
+  th,td { border:1px solid #475569; padding:4px 8px; }
+  th { background:#334155; }
+  pre { background:#020617; padding:8px; border-radius:6px; overflow-x:auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🟢 Hermes Chat</h1>
+  <div class="meta" id="userMeta">游客</div>
+</header>
+<div id="chat"></div>
+<footer>
+  <input id="input" placeholder="和 Hermes 说点什么…（Enter 发送，Shift+Enter 换行）" autocomplete="off" />
+  <button id="send">发送</button>
+</footer>
+
+<script>
+const chat = document.getElementById('chat');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const userMeta = document.getElementById('userMeta');
+
+// 用 localStorage 做"用户"标识（简单实现）
+let userId = localStorage.getItem('hermes_user') || ('u_' + Math.random().toString(36).slice(2,8));
+localStorage.setItem('hermes_user', userId);
+userMeta.textContent = '用户: ' + userId;
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// 简易 markdown：表格、代码块
+function renderMd(s) {
+  // 表格
+  s = s.replace(/((?:\|[^\n]+\|\n)+)/g, (block) => {
+    const rows = block.trim().split('\n').map(r => r.split('|').slice(1,-1).map(c => c.trim()));
+    if (rows.length < 2) return block;
+    const head = rows[0], body = rows.slice(2);
+    return '<table><thead><tr>' + head.map(h=>'<th>'+escapeHtml(h)+'</th>').join('') + '</tr></thead><tbody>' +
+      body.map(r=>'<tr>'+r.map(c=>'<td>'+escapeHtml(c)+'</td>').join('')+'</tr>').join('') + '</tbody></table>';
+  });
+  // 代码块
+  s = s.replace(/```([\s\S]*?)```/g, '<pre>$1</pre>');
+  // 行内代码
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // 换行
+  s = s.replace(/\n/g, '<br>');
+  return s;
+}
+
+function addMsg(role, content, isPartial=false) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  if (isPartial) div.classList.add('typing');
+  div.innerHTML = renderMd(content);
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+async function send() {
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  addMsg('user', text);
+  sendBtn.disabled = true;
+
+  // 创建占位 AI 消息，边收边追加
+  const aiMsg = addMsg('ai', '', true);
+
+  try {
+    const resp = await fetch('/chat', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({user_id: userId, message: text}),
+    });
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let lastContent = '';
+
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, {stream:true});
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const data = JSON.parse(payload);
+          if (data.event === 'token' && data.data) {
+            const d = JSON.parse(data.data);
+            if (d.content && d.content !== lastContent) {
+              // 深 agents 流式每条消息是完整快照
+              aiMsg.innerHTML = renderMd(d.content);
+              lastContent = d.content;
+              chat.scrollTop = chat.scrollHeight;
+            }
+          } else if (data.event === 'error') {
+            addMsg('error', '⚠️ ' + payload);
+          }
+        } catch {}
+      }
+    }
+    aiMsg.classList.remove('typing');
+  } catch (e) {
+    addMsg('error', '⚠️ ' + e.message);
+  } finally {
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+sendBtn.onclick = send;
+input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+input.focus();
+</script>
+</body>
+</html>
