@@ -1,0 +1,98 @@
+version: "3.9"
+
+# ============================================================
+# Deep Agent + Open WebUI 集成 docker-compose
+# ============================================================
+# 服务：
+#   - agent-api:    FastAPI 18（Deep Agent OpenAI 兼容端点），端口 8001
+#   - open-webui:   Open WebUI 官方镜像 + 我们的 Pipe，端口 8080
+#
+# 网络：
+#   - 两个服务在 default bridge 网络上，通过服务名互通
+#   - Open WebUI 内的 Pipe 通过 http://agent-api:8001 调用后端
+#
+# 数据持久化：
+#   - agent-data:   FastAPI 的 checkpoint / logs / workspace
+#   - openwebui-data: Open WebUI 的数据库和上传文件
+#
+# 启动：
+#   docker-compose up -d
+#   访问 http://localhost:8080
+#   第一次进入会要创建管理员账号
+#
+# 回滚：每个 service 都 build 独立镜像，要回滚某个组件：
+#   docker-compose down <service>
+#   git checkout <tag> -- <files>
+#   docker-compose up -d <service>
+# ============================================================
+
+services:
+  agent-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: deepagent-api
+    restart: unless-stopped
+    ports:
+      - "8001:8001"   # OpenAI 兼容端口
+    environment:
+      # 从 .env 读
+      - SILICONFLOW_API_KEY=${SILICONFLOW_API_KEY}
+      - SILICONFLOW_BASE_URL=${SILICONFLOW_BASE_URL}
+      - MODEL_NAME=${MODEL_NAME}
+    env_file:
+      - .env
+    volumes:
+      # 持久化运行时数据（checkpoint、logs、workspace）
+      - agent-data:/app/logs
+      - agent-data:/app/web_workspace
+    networks:
+      - agent-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/v1/models"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: unless-stopped
+    depends_on:
+      agent-api:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      # 关键：让 Open WebUI 知道我们的后端在哪
+      # 这个 URL 给 Open WebUI 的"OpenAI API"功能用
+      # 但我们的 Pipe 走自己的 BACKEND_URL，不走这个
+      OPENAI_API_BASE_URL: http://agent-api:8001/v1
+      OPENAI_API_KEY: not-needed
+      # Open WebUI 配置
+      WEBUI_AUTH: "true"
+      DEFAULT_USER_ROLE: user
+      ENABLE_SIGNUP: "true"
+      # 关闭 Open WebUI 自带模型目录的扫描（我们用 Pipe）
+      ENABLE_OLLAMA_API: "false"
+    volumes:
+      # Open WebUI 数据
+      - openwebui-data:/app/backend/data
+      # ✅ 关键：把我们的 Pipe 函数挂到 Open WebUI 的 functions 目录
+      # Open WebUI 会自动扫描并加载
+      - ./my-deepagent/pipes:/app/backend/functions
+    networks:
+      - agent-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  agent-net:
+    driver: bridge
+
+volumes:
+  agent-data:
+  openwebui-data:

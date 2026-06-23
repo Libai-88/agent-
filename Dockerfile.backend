@@ -1,0 +1,45 @@
+# Deep Agent Backend Dockerfile
+# 给 docker-compose 用：把 FastAPI 18_openai_adapter 装好跑起来
+# 镜像名：deepagent-backend
+
+FROM python:3.14-slim-bookworm
+
+WORKDIR /app
+
+# 系统依赖
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python 依赖（与 17_web_chat_full.py 同步）
+# 注意：这些版本必须和 .venv 里的一致，否则会有 API 不匹配
+RUN pip install --no-cache-dir \
+    fastapi==0.118.0 \
+    uvicorn[standard] \
+    pydantic==2.10.3 \
+    python-dotenv \
+    langchain==1.0.5 \
+    langchain-openai==0.3.33 \
+    langgraph==0.6.11 \
+    deepagents==0.6.11 \
+    aiosqlite \
+    httpx \
+    sse-starlette
+
+# 拷贝代码
+COPY my-deepagent/*.py /app/
+COPY my-deepagent/13_observability.py /app/
+
+# 工作目录
+WORKDIR /app
+
+# 环境变量（生产环境建议用 docker-compose 的 env_file 而非硬编码）
+ENV PYTHONUNBUFFERED=1 \
+    PORT=8001
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD curl -f http://localhost:8001/v1/models || exit 1
+
+# 启动
+CMD ["python", "18_openai_adapter.py"]
