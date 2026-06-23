@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 密钥和敏感信息（API Key 绝不入仓）
+.env
+.env.local
+.env.*.local
+
+# 运行时数据库（agent 状态/checkpoint）
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+memory.db
+checkpoints.db
+
+# 运行时数据目录（agent 在执行中产生的中间文件）
+# 保留 vfs_demo/ 和 memory_demo/（它们是演示初始数据）
+
+# 日志
+*.log
+web.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# 临时文件
+*.tmp
+*.bak
