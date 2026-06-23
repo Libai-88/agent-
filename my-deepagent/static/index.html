@@ -2,67 +2,178 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8" />
-<title>Hermes Chat</title>
+<title>Hermes Chat Full</title>
 <style>
   * { box-sizing: border-box; }
   body { margin:0; font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
          background:#0f172a; color:#e2e8f0; height:100vh; display:flex; flex-direction:column; }
-  header { padding:12px 20px; background:#1e293b; border-bottom:1px solid #334155;
-           display:flex; justify-content:space-between; align-items:center; }
+  header { padding:10px 20px; background:#1e293b; border-bottom:1px solid #334155;
+           display:flex; justify-content:space-between; align-items:center; gap:10px; }
   header h1 { margin:0; font-size:16px; color:#38bdf8; }
-  header .meta { font-size:12px; color:#94a3b8; }
+  header .meta { font-size:12px; color:#94a3b8; display:flex; gap:8px; align-items:center; }
+  button { padding:6px 12px; background:#334155; color:#e2e8f0; border:none;
+           border-radius:6px; cursor:pointer; font-size:13px; }
+  button:hover { background:#475569; }
+  button.primary { background:#38bdf8; color:#0f172a; font-weight:600; }
+  button.danger { background:#dc2626; }
+  button:disabled { background:#475569; cursor:not-allowed; opacity:0.5; }
+
+  #layout { flex:1; display:flex; overflow:hidden; }
+  #sidebar { width:260px; background:#0b1426; border-right:1px solid #334155;
+             display:flex; flex-direction:column; overflow:hidden; }
+  .sb-section { border-bottom:1px solid #1e293b; }
+  .sb-title { padding:10px 14px; font-size:12px; color:#94a3b8;
+              text-transform:uppercase; letter-spacing:0.5px; display:flex;
+              justify-content:space-between; align-items:center; }
+  .sb-title button { padding:2px 8px; font-size:11px; }
+  .sb-content { padding:6px 10px; max-height:300px; overflow-y:auto; }
+  .history-item { padding:6px 10px; border-radius:6px; cursor:pointer; font-size:12px;
+                  color:#cbd5e1; margin:2px 0; white-space:nowrap; overflow:hidden;
+                  text-overflow:ellipsis; }
+  .history-item:hover { background:#1e293b; }
+  .history-item.active { background:#0c4a6e; color:white; }
+  .file-tree { font-size:12px; font-family:monospace; }
+  .file-node { padding:2px 0; cursor:pointer; }
+  .file-node:hover { color:#38bdf8; }
+  .file-node .icon { display:inline-block; width:16px; }
+  .file-content { background:#020617; padding:8px; margin:4px 0; border-radius:4px;
+                   font-family:monospace; font-size:11px; max-height:200px;
+                   overflow:auto; white-space:pre-wrap; }
+
+  #main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+  #todo-bar { padding:8px 20px; background:#1e293b; border-bottom:1px solid #334155;
+              font-size:12px; display:none; }
+  #todo-bar.visible { display:block; }
+  .todo-item { display:flex; align-items:center; gap:8px; padding:2px 0; }
+  .todo-icon { width:16px; text-align:center; }
+  .todo-item.pending .todo-icon { color:#94a3b8; }
+  .todo-item.in_progress .todo-icon { color:#fbbf24; }
+  .todo-item.completed .todo-icon { color:#22c55e; }
+  .todo-item.completed .todo-text { text-decoration:line-through; color:#64748b; }
+  .todo-item.in_progress .todo-text { color:#fbbf24; font-weight:600; }
+
   #chat { flex:1; overflow-y:auto; padding:20px; }
-  .msg { max-width:80%; margin:8px 0; padding:10px 14px; border-radius:12px;
+  .msg { max-width:85%; margin:8px 0; padding:10px 14px; border-radius:12px;
          white-space:pre-wrap; word-wrap:break-word; }
-  .user { background:#2563eb; color:white; margin-left:auto; }
-  .ai { background:#1e293b; color:#e2e8f0; border:1px solid #334155; }
-  .tool { background:#064e3b; color:#a7f3d0; font-family:monospace; font-size:12px; }
-  .error { background:#7f1d1d; color:#fecaca; }
+  .msg.user { background:#2563eb; color:white; margin-left:auto; }
+  .msg.ai { background:#1e293b; color:#e2e8f0; border:1px solid #334155; }
+  .msg.error { background:#7f1d1d; color:#fecaca; }
+  .msg.system { background:#0c4a6e; color:#bae6fd; font-size:12px; font-style:italic; }
+  .tool-card { max-width:85%; margin:6px 0; padding:0; border-radius:8px;
+               background:#064e3b; color:#a7f3d0; font-family:monospace; font-size:12px;
+               overflow:hidden; border:1px solid #065f46; }
+  .tool-card-head { padding:8px 12px; cursor:pointer; user-select:none;
+                    display:flex; justify-content:space-between; align-items:center; }
+  .tool-card-head .name { font-weight:600; color:#6ee7b7; }
+  .tool-card-head .arrow { transition:transform 0.2s; }
+  .tool-card.open .tool-card-head .arrow { transform:rotate(90deg); }
+  .tool-card-body { padding:8px 12px; border-top:1px solid #065f46;
+                    background:#022c22; display:none; white-space:pre-wrap;
+                    word-wrap:break-word; max-height:400px; overflow-y:auto; }
+  .tool-card.open .tool-card-body { display:block; }
+
   footer { padding:12px 20px; background:#1e293b; border-top:1px solid #334155;
            display:flex; gap:8px; }
   input { flex:1; padding:10px 14px; border-radius:8px; border:1px solid #334155;
           background:#0f172a; color:#e2e8f0; font-size:14px; outline:none; }
   input:focus { border-color:#38bdf8; }
-  button { padding:10px 20px; background:#38bdf8; color:#0f172a; border:none;
-           border-radius:8px; font-weight:600; cursor:pointer; }
-  button:disabled { background:#475569; cursor:not-allowed; }
-  .typing { display:inline-block; }
+
+  /* 模态框 */
+  .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none;
+              align-items:center; justify-content:center; z-index:100; }
+  .modal-bg.visible { display:flex; }
+  .modal { background:#1e293b; padding:20px; border-radius:12px; max-width:600px;
+           width:90%; border:1px solid #334155; }
+  .modal h3 { margin:0 0 12px 0; color:#fbbf24; }
+  .modal pre { background:#0f172a; padding:10px; border-radius:6px;
+               max-height:300px; overflow:auto; font-size:12px; }
+  .modal .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+
   .typing::after { content:"▍"; animation:blink 1s infinite; }
   @keyframes blink { 50% { opacity:0; } }
   table { border-collapse:collapse; margin:8px 0; }
   th,td { border:1px solid #475569; padding:4px 8px; }
   th { background:#334155; }
   pre { background:#020617; padding:8px; border-radius:6px; overflow-x:auto; }
+  code { background:#020617; padding:1px 4px; border-radius:3px; }
 </style>
 </head>
 <body>
+
 <header>
-  <h1>🟢 Hermes Chat</h1>
-  <div class="meta" id="userMeta">游客</div>
+  <h1>🟢 Hermes Chat <span style="color:#64748b; font-size:11px; font-weight:normal;">v2 (full)</span></h1>
+  <div class="meta">
+    <span id="userMeta">游客</span>
+    <button onclick="newChat()">新会话</button>
+  </div>
 </header>
-<div id="chat"></div>
-<footer>
-  <input id="input" placeholder="和 Hermes 说点什么…（Enter 发送，Shift+Enter 换行）" autocomplete="off" />
-  <button id="send">发送</button>
-</footer>
+
+<div id="layout">
+  <!-- 侧边栏：历史 + 文件浏览器 -->
+  <div id="sidebar">
+    <div class="sb-section">
+      <div class="sb-title">
+        <span>📜 会话历史</span>
+        <button onclick="loadHistoryList()">刷新</button>
+      </div>
+      <div class="sb-content" id="historyList">
+        <div style="color:#64748b; font-size:12px; padding:4px;">暂无历史</div>
+      </div>
+    </div>
+    <div class="sb-section" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+      <div class="sb-title">
+        <span>📁 VFS 文件</span>
+        <button onclick="loadFileTree()">刷新</button>
+      </div>
+      <div class="sb-content" id="fileTree" style="flex:1;">
+        <div style="color:#64748b; font-size:12px; padding:4px;">加载中…</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="main">
+    <!-- TODO 进度条 -->
+    <div id="todo-bar"></div>
+    <!-- 对话区 -->
+    <div id="chat"></div>
+    <!-- 输入区 -->
+    <footer>
+      <input id="input" placeholder="和 Hermes 说点什么…（Enter 发送）" autocomplete="off" />
+      <button id="send" class="primary" onclick="send()">发送</button>
+      <button id="cancel" class="danger" onclick="cancel()" style="display:none;">停止</button>
+    </footer>
+  </div>
+</div>
+
+<!-- HITL 审批模态框 -->
+<div class="modal-bg" id="approvalModal">
+  <div class="modal">
+    <h3>⚠️ 需要审批</h3>
+    <div id="approvalBody"></div>
+    <div class="actions">
+      <button class="danger" onclick="approve(false)">拒绝</button>
+      <button class="primary" onclick="approve(true)">批准</button>
+    </div>
+  </div>
+</div>
 
 <script>
-const chat = document.getElementById('chat');
-const input = document.getElementById('input');
-const sendBtn = document.getElementById('send');
-const userMeta = document.getElementById('userMeta');
-
-// 用 localStorage 做"用户"标识（简单实现）
+// ====================== 状态 ======================
 let userId = localStorage.getItem('hermes_user') || ('u_' + Math.random().toString(36).slice(2,8));
 localStorage.setItem('hermes_user', userId);
-userMeta.textContent = '用户: ' + userId;
+document.getElementById('userMeta').textContent = '用户: ' + userId;
 
+let currentThread = userId;  // 默认就用 userId 作为 thread_id
+let abortController = null;
+
+// ====================== 工具函数 ======================
 function escapeHtml(s) {
+  if (typeof s !== 'string') s = JSON.stringify(s, null, 2);
   return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-// 简易 markdown：表格、代码块
 function renderMd(s) {
+  if (typeof s !== 'string') s = JSON.stringify(s, null, 2);
   // 表格
   s = s.replace(/((?:\|[^\n]+\|\n)+)/g, (block) => {
     const rows = block.trim().split('\n').map(r => r.split('|').slice(1,-1).map(c => c.trim()));
@@ -71,16 +182,14 @@ function renderMd(s) {
     return '<table><thead><tr>' + head.map(h=>'<th>'+escapeHtml(h)+'</th>').join('') + '</tr></thead><tbody>' +
       body.map(r=>'<tr>'+r.map(c=>'<td>'+escapeHtml(c)+'</td>').join('')+'</tr>').join('') + '</tbody></table>';
   });
-  // 代码块
   s = s.replace(/```([\s\S]*?)```/g, '<pre>$1</pre>');
-  // 行内代码
   s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
-  // 换行
   s = s.replace(/\n/g, '<br>');
   return s;
 }
 
 function addMsg(role, content, isPartial=false) {
+  const chat = document.getElementById('chat');
   const div = document.createElement('div');
   div.className = 'msg ' + role;
   if (isPartial) div.classList.add('typing');
@@ -90,21 +199,251 @@ function addMsg(role, content, isPartial=false) {
   return div;
 }
 
+function addSystemMsg(text) { return addMsg('system', text); }
+
+// ====================== 1. 历史加载 ======================
+async function loadHistoryForThread(threadId) {
+  try {
+    const resp = await fetch('/api/history?user_id=' + encodeURIComponent(threadId));
+    if (!resp.ok) return;
+    const data = await resp.json();
+    document.getElementById('chat').innerHTML = '';
+    if (!data.messages || data.messages.length === 0) {
+      addSystemMsg('（空会话）');
+      return;
+    }
+    for (const m of data.messages) {
+      if (m.type === 'human' || m.type === 'user') {
+        addMsg('user', m.content);
+      } else if (m.type === 'ai') {
+        if (m.content) addMsg('ai', m.content);
+        if (m.tool_calls) {
+          for (const tc of m.tool_calls) {
+            addToolCard(tc.name, tc.args, null, tc.id);
+          }
+        }
+      } else if (m.type === 'tool') {
+        // 更新最后一个 tool_card
+        updateLastToolCard(m.content, m.tool_call_id);
+      }
+    }
+    if (data.todos && data.todos.length > 0) {
+      renderTodos(data.todos);
+    }
+  } catch (e) {
+    addMsg('error', '⚠️ 加载历史失败: ' + e.message);
+  }
+}
+
+async function loadHistoryList() {
+  // 我们用 localStorage 维护一个 thread 列表
+  // 因为 backend 没有 /threads 列表接口
+  const list = JSON.parse(localStorage.getItem('hermes_threads') || '[]');
+  const el = document.getElementById('historyList');
+  if (list.length === 0) {
+    el.innerHTML = '<div style="color:#64748b; font-size:12px; padding:4px;">还没有历史会话</div>';
+    return;
+  }
+  el.innerHTML = list.map(t =>
+    `<div class="history-item ${t===currentThread?'active':''}" onclick="switchThread('${escapeHtml(t)}')">${escapeHtml(t)}</div>`
+  ).join('');
+}
+
+function saveCurrentThread() {
+  if (!currentThread) return;
+  const list = JSON.parse(localStorage.getItem('hermes_threads') || '[]');
+  if (!list.includes(currentThread)) {
+    list.unshift(currentThread);
+    localStorage.setItem('hermes_threads', JSON.stringify(list.slice(0, 20)));
+  }
+}
+
+function switchThread(t) {
+  currentThread = t;
+  loadHistoryForThread(t);
+  loadHistoryList();
+}
+
+function newChat() {
+  currentThread = 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+  document.getElementById('chat').innerHTML = '';
+  document.getElementById('todo-bar').classList.remove('visible');
+  addSystemMsg('✨ 新会话已创建：' + currentThread);
+  const list = JSON.parse(localStorage.getItem('hermes_threads') || '[]');
+  list.unshift(currentThread);
+  localStorage.setItem('hermes_threads', JSON.stringify(list.slice(0, 20)));
+  loadHistoryList();
+}
+
+// ====================== 2. TODO 进度条 ======================
+function renderTodos(todos) {
+  const bar = document.getElementById('todo-bar');
+  if (!todos || todos.length === 0) {
+    bar.classList.remove('visible');
+    return;
+  }
+  bar.classList.add('visible');
+  const iconMap = {pending: '○', in_progress: '◐', completed: '●'};
+  bar.innerHTML = todos.map(t => {
+    const icon = iconMap[t.status] || '○';
+    return `<div class="todo-item ${t.status}">
+      <span class="todo-icon">${icon}</span>
+      <span class="todo-text">${escapeHtml(t.content)}</span>
+      <span style="color:#64748b; font-size:11px; margin-left:auto;">[${t.status}]</span>
+    </div>`;
+  }).join('');
+}
+
+// ====================== 3. 工具调用卡片 ======================
+const toolCardMap = {};  // tool_call_id -> {cardEl, name, args, result}
+
+function addToolCard(name, args, result, callId) {
+  const chat = document.getElementById('chat');
+  const card = document.createElement('div');
+  card.className = 'tool-card open';  // 默认展开
+  card.innerHTML = `
+    <div class="tool-card-head" onclick="this.parentElement.classList.toggle('open')">
+      <span class="name">🔧 ${escapeHtml(name)}</span>
+      <span class="arrow">▶</span>
+    </div>
+    <div class="tool-card-body">
+      <div><b>Args:</b></div>
+      <pre>${escapeHtml(JSON.stringify(args, null, 2))}</pre>
+      <div><b>Result:</b></div>
+      <pre class="result" data-cid="${escapeHtml(callId||'')}">${result ? escapeHtml(result) : '<i style="color:#64748b;">⏳ 等待结果…</i>'}</pre>
+    </div>
+  `;
+  chat.appendChild(card);
+  chat.scrollTop = chat.scrollHeight;
+  if (callId) toolCardMap[callId] = card;
+  return card;
+}
+
+function updateLastToolCard(result, callId) {
+  let card = callId ? toolCardMap[callId] : null;
+  if (!card) {
+    // 没找到对应 card，单独渲染一个
+    const chat = document.getElementById('chat');
+    card = document.createElement('div');
+    card.className = 'tool-card';
+    card.innerHTML = `
+      <div class="tool-card-head" onclick="this.parentElement.classList.toggle('open')">
+        <span class="name">📤 Tool Result</span><span class="arrow">▶</span>
+      </div>
+      <div class="tool-card-body"><pre>${escapeHtml(result)}</pre></div>
+    `;
+    chat.appendChild(card);
+  } else {
+    const pre = card.querySelector('.result');
+    if (pre) pre.innerHTML = escapeHtml(result);
+  }
+  chat.scrollTop = chat.scrollHeight;
+}
+
+// ====================== 5. VFS 文件浏览器 ======================
+async function loadFileTree() {
+  try {
+    const resp = await fetch('/api/files/tree');
+    const data = await resp.json();
+    renderFileNode(data, document.getElementById('fileTree'));
+  } catch (e) {
+    document.getElementById('fileTree').innerHTML =
+      '<div style="color:#fecaca; font-size:12px;">加载失败: ' + e.message + '</div>';
+  }
+}
+
+function renderFileNode(node, container, depth=0) {
+  const div = document.createElement('div');
+  div.className = 'file-node';
+  div.style.paddingLeft = (depth * 12) + 'px';
+  if (node.type === 'dir') {
+    div.innerHTML = `<span class="icon">📁</span>${escapeHtml(node.name)}`;
+    container.appendChild(div);
+    if (node.children) {
+      for (const c of node.children) renderFileNode(c, container, depth + 1);
+    }
+  } else {
+    const sizeKb = (node.size / 1024).toFixed(1);
+    div.innerHTML = `<span class="icon">📄</span>${escapeHtml(node.name)} <span style="color:#64748b;">${sizeKb}KB</span>`;
+    div.onclick = () => readFile(node.path);
+    container.appendChild(div);
+  }
+}
+
+async function readFile(path) {
+  try {
+    const resp = await fetch('/api/files/read?path=' + encodeURIComponent(path));
+    const data = await resp.json();
+    if (data.error) {
+      addMsg('error', '⚠️ ' + data.error);
+      return;
+    }
+    addSystemMsg('📄 ' + path);
+    addMsg('ai', '```\n' + data.content + '\n```');
+  } catch (e) {
+    addMsg('error', '⚠️ ' + e.message);
+  }
+}
+
+// ====================== 6. HITL 审批 ======================
+function showApprovalModal(hitlRequest) {
+  const body = document.getElementById('approvalBody');
+  body.innerHTML = hitlRequest.action_requests.map(ar => `
+    <div style="margin-bottom:12px;">
+      <div style="color:#94a3b8; font-size:12px; margin-bottom:4px;">${escapeHtml(ar.description || '')}</div>
+      <div style="font-weight:600; color:#fbbf24; margin-bottom:6px;">Tool: ${escapeHtml(ar.name)}</div>
+      <pre>${escapeHtml(JSON.stringify(ar.args, null, 2))}</pre>
+    </div>
+  `).join('');
+  document.getElementById('approvalModal').classList.add('visible');
+  return new Promise(resolve => {
+    window._approvalResolver = resolve;
+  });
+}
+
+function approve(ok) {
+  document.getElementById('approvalModal').classList.remove('visible');
+  if (window._approvalResolver) {
+    window._approvalResolver({type: ok ? 'approve' : 'reject'});
+    window._approvalResolver = null;
+  }
+}
+
+// ====================== 4. 取消 + 发送 ======================
+function cancel() {
+  if (abortController) abortController.abort();
+  fetch('/api/cancel', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({user_id: currentThread}),
+  });
+  document.getElementById('cancel').style.display = 'none';
+  document.getElementById('send').style.display = '';
+  addSystemMsg('⏹️ 已停止生成');
+}
+
 async function send() {
+  const input = document.getElementById('input');
   const text = input.value.trim();
   if (!text) return;
   input.value = '';
+  saveCurrentThread();
   addMsg('user', text);
-  sendBtn.disabled = true;
 
-  // 创建占位 AI 消息，边收边追加
+  const sendBtn = document.getElementById('send');
+  const cancelBtn = document.getElementById('cancel');
+  sendBtn.style.display = 'none';
+  cancelBtn.style.display = '';
+
   const aiMsg = addMsg('ai', '', true);
+  abortController = new AbortController();
 
   try {
     const resp = await fetch('/chat', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({user_id: userId, message: text}),
+      body: JSON.stringify({user_id: currentThread, message: text}),
+      signal: abortController.signal,
     });
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
@@ -126,29 +465,61 @@ async function send() {
           if (data.event === 'token' && data.data) {
             const d = JSON.parse(data.data);
             if (d.content && d.content !== lastContent) {
-              // 深 agents 流式每条消息是完整快照
               aiMsg.innerHTML = renderMd(d.content);
               lastContent = d.content;
-              chat.scrollTop = chat.scrollHeight;
+              document.getElementById('chat').scrollTop =
+                document.getElementById('chat').scrollHeight;
             }
+          } else if (data.event === 'tool_call') {
+            for (const tc of data.data) {
+              addToolCard(tc.name, tc.args, null, tc.id);
+            }
+          } else if (data.event === 'tool_result') {
+            updateLastToolCard(data.data.content, data.data.tool_call_id);
+          } else if (data.event === 'todos') {
+            renderTodos(data.data);
+          } else if (data.event === 'interrupt') {
+            const decision = await showApprovalModal(data.data);
+            await fetch('/api/approve', {
+              method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({user_id: currentThread, decisions: [decision]}),
+            });
+            addSystemMsg(decision.type === 'approve' ? '✅ 已批准' : '❌ 已拒绝');
           } else if (data.event === 'error') {
             addMsg('error', '⚠️ ' + payload);
           }
-        } catch {}
+        } catch (e) {}
       }
     }
     aiMsg.classList.remove('typing');
   } catch (e) {
-    addMsg('error', '⚠️ ' + e.message);
+    if (e.name !== 'AbortError') addMsg('error', '⚠️ ' + e.message);
   } finally {
-    sendBtn.disabled = false;
-    input.focus();
+    sendBtn.style.display = '';
+    cancelBtn.style.display = 'none';
+    abortController = null;
+    document.getElementById('input').focus();
   }
 }
 
-sendBtn.onclick = send;
-input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
-input.focus();
+// ====================== 启动 ======================
+document.getElementById('send').onclick = send;
+document.getElementById('input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
+window.switchThread = switchThread;
+window.approve = approve;
+window.loadFileTree = loadFileTree;
+window.loadHistoryList = loadHistoryList;
+window.newChat = newChat;
+window.cancel = cancel;
+window.send = send;
+
+// 初始化：加载历史 + 文件树
+loadHistoryForThread(currentThread);
+loadFileTree();
+loadHistoryList();
 </script>
 </body>
 </html>
